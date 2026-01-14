@@ -1,10 +1,10 @@
 import { INITIAL_RESIDENTS } from '../data/residents';
 
-export const loadData = async () => {
+export const loadData = () => {
   try {
-    const result = await window.storage.get('residents-data');
-    if (result && result.value) {
-      return JSON.parse(result.value);
+    const data = localStorage.getItem('residents-data');
+    if (data) {
+      return JSON.parse(data);
     }
   } catch (error) {
     console.log('Nav esošu datu, sāk no jauna');
@@ -12,9 +12,9 @@ export const loadData = async () => {
   return null;
 };
 
-export const saveData = async (data) => {
+export const saveData = (data) => {
   try {
-    await window.storage.set('residents-data', JSON.stringify(data));
+    localStorage.setItem('residents-data', JSON.stringify(data));
     return true;
   } catch (error) {
     console.error('Kļūda saglabājot datus:', error);
@@ -38,7 +38,7 @@ export const generateResidentLink = (residentId) => {
   return `${baseUrl}?resident=${residentId}`;
 };
 
-export const calculateConsumption = (readings, meterCount, rate) => {
+export const calculateConsumption = (readings, meterCount) => {
   if (readings.length < 2) return null;
 
   const latest = readings[0];
@@ -55,7 +55,6 @@ export const calculateConsumption = (readings, meterCount, rate) => {
 
   return {
     meters: meterConsumption,
-    total: totalConsumption,
-    cost: totalConsumption * rate
+    total: totalConsumption
   };
 };

@@ -15,5 +15,3 @@ export const INITIAL_RESIDENTS = [
   { name: 'Miks', apartment: '7-17', email: 'miks.petersons@nordi.com', meters: 1 },
   { name: 'Dmitrijs', apartment: '7-2', email: 'd.saldovs@gmail.com', meters: 1 }
 ];
-
-export const WATER_RATE = 0.85; // EUR per m³

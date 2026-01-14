@@ -12,25 +12,24 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const residentId = params.get('resident');
     
-    loadData().then((loadedData) => {
-      if (residentId) {
-        setCurrentView(residentId);
-      }
-      
-      if (!loadedData || loadedData.length === 0) {
-        const initialized = initializeResidents();
-        setResidents(initialized);
-        saveData(initialized);
-      } else {
-        setResidents(loadedData);
-      }
-      setLoading(false);
-    });
+    const loadedData = loadData();
+    if (residentId) {
+      setCurrentView(residentId);
+    }
+    
+    if (!loadedData || loadedData.length === 0) {
+      const initialized = initializeResidents();
+      setResidents(initialized);
+      saveData(initialized);
+    } else {
+      setResidents(loadedData);
+    }
+    setLoading(false);
   }, []);
 
-  const updateResidents = async (newResidents) => {
+  const updateResidents = (newResidents) => {
     setResidents(newResidents);
-    await saveData(newResidents);
+    saveData(newResidents);
   };
 
   if (loading) {

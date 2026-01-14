@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Droplet, Calendar, TrendingUp, Plus, Lock } from 'lucide-react';
 import { calculateConsumption } from '../utils/storage';
-import { WATER_RATE } from '../data/residents';
 import './ResidentView.css';
 
 function ResidentView({ residentId, residents, updateResidents }) {
@@ -25,13 +24,16 @@ function ResidentView({ residentId, residents, updateResidents }) {
     );
   }
 
-  const consumption = residentData.readings.length >= 2 
-    ? calculateConsumption(residentData.readings, residentData.meters, WATER_RATE) 
+  const readings = residentData.readings || [];
+  const meterCount = Number(residentData.meters) || 0;
+
+  const consumption = readings.length >= 2
+    ? calculateConsumption(readings, meterCount)
     : null;
 
   const handleAddReading = () => {
     // Check if all meter readings are filled
-    for (let i = 1; i <= residentData.meters; i++) {
+    for (let i = 1; i <= meterCount; i++) {
       if (!newReading.meters[i] || newReading.meters[i] === '') {
         alert('Lūdzu, ievadiet visus skaitītāju rādījumus');
         return;
@@ -45,7 +47,7 @@ function ResidentView({ residentId, residents, updateResidents }) {
       timestamp: Date.now()
     };
 
-    for (let i = 1; i <= residentData.meters; i++) {
+    for (let i = 1; i <= meterCount; i++) {
       reading.meters[i] = parseFloat(newReading.meters[i]);
     }
 
@@ -64,7 +66,7 @@ function ResidentView({ residentId, residents, updateResidents }) {
 
   const openAddReading = () => {
     const initialMeters = {};
-    for (let i = 1; i <= residentData.meters; i++) {
+    for (let i = 1; i <= meterCount; i++) {
       initialMeters[i] = '';
     }
     setNewReading({ 
@@ -110,8 +112,6 @@ function ResidentView({ residentId, residents, updateResidents }) {
                 <div className="consumption-stat total">
                   <div className="consumption-value">{consumption.total.toFixed(2)}</div>
                   <div className="consumption-label">m³ kopā</div>
-                  <div className="consumption-cost">€{consumption.cost.toFixed(2)}</div>
-                  <div className="consumption-label small">Maksājams</div>
                 </div>
               </div>
             </div>
@@ -122,19 +122,19 @@ function ResidentView({ residentId, residents, updateResidents }) {
               <Calendar size={24} />
               RĀDĪJUMU VĒSTURE
             </h3>
-            {residentData.readings.length === 0 ? (
+            {readings.length === 0 ? (
               <div className="no-readings">
                 <Droplet size={64} />
                 <p>Rādījumi vēl nav pievienoti</p>
               </div>
             ) : (
               <div className="readings-list">
-                {residentData.readings.map((reading, idx) => {
-                  const prevReading = residentData.readings[idx + 1];
+                {readings.map((reading, idx) => {
+                  const prevReading = readings[idx + 1];
                   const diff = prevReading ? {} : null;
-                  
+
                   if (diff) {
-                    for (let i = 1; i <= residentData.meters; i++) {
+                    for (let i = 1; i <= meterCount; i++) {
                       diff[i] = reading.meters[i] - prevReading.meters[i];
                     }
                   }
@@ -153,7 +153,7 @@ function ResidentView({ residentId, residents, updateResidents }) {
                           <div key={meterNum} className="meter-reading">
                             <span className="meter-label">Skaitītājs {meterNum}:</span>
                             <span className="meter-value">{reading.meters[meterNum]} m³</span>
-                            {diff && (
+                            {diff && diff[meterNum] !== undefined && (
                               <span className="meter-diff">(+{diff[meterNum].toFixed(2)})</span>
                             )}
                           </div>
