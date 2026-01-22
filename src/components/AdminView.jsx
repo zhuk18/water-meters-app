@@ -309,7 +309,7 @@ function AdminView({ residents, updateResidents }) {
                           </div>
                           {lastReading && Object.keys(lastReading.meters).sort().map(meterNum => (
                             <div key={meterNum} className="stat-item">
-                              <div className="stat-label">Skaitītājs {meterNum}</div>
+                              <div className="stat-label">Skaitītājs {meterNum}{resident.meterIds?.[meterNum - 1] ? ` (${resident.meterIds[meterNum - 1]})` : ''}</div>
                               <div className="stat-value meter">{lastReading.meters[meterNum]} m³</div>
                             </div>
                           ))}
@@ -365,7 +365,7 @@ function AdminView({ residents, updateResidents }) {
                                     <div className="reading-meters">
                                       {Object.keys(reading.meters).sort().map(meterNum => (
                                         <div key={meterNum} className="meter-reading">
-                                          <span className="meter-label">Skaitītājs {meterNum}:</span>
+                                          <span className="meter-label">Skaitītājs {meterNum}{resident.meterIds?.[meterNum - 1] ? ` (${resident.meterIds[meterNum - 1]})` : ''}:</span>
                                           <span className="meter-value">{reading.meters[meterNum]} m³</span>
                                           {diff && diff[meterNum] !== undefined && (
                                             <span className="meter-diff">(+{diff[meterNum].toFixed(2)})</span>
@@ -551,9 +551,12 @@ function AdminView({ residents, updateResidents }) {
                 onChange={(e) => setNewReading({...newReading, date: e.target.value})}
               />
             </div>
-            {Array.from({ length: residents.find(r => r.id === addingResidentId).meters }, (_, i) => i + 1).map(meterNum => (
+            {Array.from({ length: residents.find(r => r.id === addingResidentId).meters }, (_, i) => i + 1).map(meterNum => {
+              const resident = residents.find(r => r.id === addingResidentId);
+              const meterId = resident.meterIds?.[meterNum - 1];
+              return (
               <div key={meterNum} className="form-group">
-                <label className="meter-label">Skaitītājs {meterNum} (m³)</label>
+                <label className="meter-label">Skaitītājs {meterNum}{meterId ? ` (${meterId})` : ''} (m³)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -566,7 +569,8 @@ function AdminView({ residents, updateResidents }) {
                   placeholder="123.45"
                 />
               </div>
-            ))}
+            );
+            })}
             <div className="modal-actions">
               <button 
                 className="btn btn-secondary"
@@ -602,9 +606,12 @@ function AdminView({ residents, updateResidents }) {
                 onChange={(e) => setEditingReading({...editingReading, date: e.target.value})}
               />
             </div>
-            {Array.from({ length: residents.find(r => r.id === editingResidentId).meters }, (_, i) => i + 1).map(meterNum => (
+            {Array.from({ length: residents.find(r => r.id === editingResidentId).meters }, (_, i) => i + 1).map(meterNum => {
+              const resident = residents.find(r => r.id === editingResidentId);
+              const meterId = resident.meterIds?.[meterNum - 1];
+              return (
               <div key={meterNum} className="form-group">
-                <label className="meter-label">Skaitītājs {meterNum} (m³)</label>
+                <label className="meter-label">Skaitītājs {meterNum}{meterId ? ` (${meterId})` : ''} (m³)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -617,7 +624,8 @@ function AdminView({ residents, updateResidents }) {
                   placeholder="123.45"
                 />
               </div>
-            ))}
+            );
+            })}
             <div className="modal-actions">
               <button 
                 className="btn btn-secondary"

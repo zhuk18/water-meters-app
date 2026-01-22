@@ -29,6 +29,7 @@ export const initializeResidents = () => {
     apartment: r.apartment,
     email: r.email,
     meters: r.meters,
+    meterIds: r.meterIds,
     readings: []
   }));
 };

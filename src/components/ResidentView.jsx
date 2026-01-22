@@ -106,7 +106,7 @@ function ResidentView({ residentId, residents, updateResidents }) {
                 {Object.keys(consumption.meters).map(meterNum => (
                   <div key={meterNum} className="consumption-stat">
                     <div className="consumption-value">{consumption.meters[meterNum].toFixed(2)}</div>
-                    <div className="consumption-label">m³ (Skaitītājs {meterNum})</div>
+                    <div className="consumption-label">m³ (Skaitītājs {meterNum}{residentData.meterIds?.[meterNum - 1] ? ` - ${residentData.meterIds[meterNum - 1]}` : ''})</div>
                   </div>
                 ))}
                 <div className="consumption-stat total">
@@ -151,7 +151,7 @@ function ResidentView({ residentId, residents, updateResidents }) {
                       <div className="reading-meters">
                         {Object.keys(reading.meters).sort().map(meterNum => (
                           <div key={meterNum} className="meter-reading">
-                            <span className="meter-label">Skaitītājs {meterNum}:</span>
+                            <span className="meter-label">Skaitītājs {meterNum}{residentData.meterIds?.[meterNum - 1] ? ` (${residentData.meterIds[meterNum - 1]})` : ''}:</span>
                             <span className="meter-value">{reading.meters[meterNum]} m³</span>
                             {diff && diff[meterNum] !== undefined && (
                               <span className="meter-diff">(+{diff[meterNum].toFixed(2)})</span>
@@ -181,9 +181,11 @@ function ResidentView({ residentId, residents, updateResidents }) {
                 onChange={(e) => setNewReading({...newReading, date: e.target.value})}
               />
             </div>
-            {Array.from({ length: residentData.meters }, (_, i) => i + 1).map(meterNum => (
+            {Array.from({ length: residentData.meters }, (_, i) => i + 1).map(meterNum => {
+              const meterId = residentData.meterIds?.[meterNum - 1];
+              return (
               <div key={meterNum} className="form-group">
-                <label className="meter-label">Skaitītājs {meterNum} (m³)</label>
+                <label className="meter-label">Skaitītājs {meterNum}{meterId ? ` (${meterId})` : ''} (m³)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -196,7 +198,8 @@ function ResidentView({ residentId, residents, updateResidents }) {
                   placeholder="123.45"
                 />
               </div>
-            ))}
+            );
+            })}
             <div className="modal-actions">
               <button 
                 className="btn btn-secondary"
