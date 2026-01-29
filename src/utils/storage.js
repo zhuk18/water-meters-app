@@ -283,3 +283,39 @@ export const calculateConsumption = (readings, meterCount) => {
     total: totalConsumption
   };
 };
+
+export const sendReminderEmails = async (residents, subject = 'Pienāk laiks ievadīt ūdens skaitītāju rādījumus', message = 'Lūdzu ievadiet jūsu mājokļa ūdens skaitītāju rādījumus. Tas aizņem tikai dažas minūtes.') => {
+  try {
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+    const functionUrl = `${SUPABASE_URL}/functions/v1/send-reminder-emails`;
+
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        residents: residents.map(r => ({
+          id: r.id,
+          name: r.name,
+          email: r.email,
+        })),
+        subject,
+        message,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Failed to send reminder emails');
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Error sending reminder emails:', error);
+    throw error;
+  }
+};

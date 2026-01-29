@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Settings, Plus, Copy, Check, Home, Edit, Trash2, Droplet, Download } from 'lucide-react';
-import { generateResidentLink, calculateConsumption } from '../utils/storage';
+import { Settings, Plus, Copy, Check, Home, Edit, Trash2, Droplet, Download, Mail } from 'lucide-react';
+import { generateResidentLink, calculateConsumption, sendReminderEmails } from '../utils/storage';
 import './AdminView.css';
 
 function AdminView({ residents, updateResidents }) {
@@ -232,6 +232,21 @@ function AdminView({ residents, updateResidents }) {
     URL.revokeObjectURL(url);
   };
 
+  const sendReminders = async () => {
+    const residentsWithEmail = residents.filter(r => r.email && r.email.trim());
+    if (residentsWithEmail.length === 0) {
+      alert('Nav iedzīvotāju ar e-pasta adresēm');
+      return;
+    }
+
+    try {
+      const result = await sendReminderEmails(residentsWithEmail);
+      alert(`E-pasta atgādinājumi sūtīti: ${result.sent} sekmīgi, ${result.failed} nesekmīgi`);
+    } catch (error) {
+      alert(`Kļūda sūtot e-pastus: ${error.message}`);
+    }
+  };
+
   const sortedResidents = [...residents].sort((a, b) => {
     const numA = parseFloat(a.apartment.split('-')[1]);
     const numB = parseFloat(b.apartment.split('-')[1]);
@@ -265,6 +280,10 @@ function AdminView({ residents, updateResidents }) {
               <div className="card-header">
                 <h2>IEDZĪVOTĀJI ({residents.length})</h2>
                 <div className="card-actions">
+                  <button className="btn btn-secondary" onClick={sendReminders}>
+                    <Mail size={20} />
+                    Pārsūtīt atgādinājumus
+                  </button>
                   <button className="btn btn-secondary" onClick={exportReadings}>
                     <Download size={20} />
                     Eksportēt datus
