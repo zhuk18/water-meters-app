@@ -9,27 +9,31 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const residentId = params.get('resident');
-    
-    const loadedData = loadData();
-    if (residentId) {
-      setCurrentView(residentId);
-    }
-    
-    if (!loadedData || loadedData.length === 0) {
-      const initialized = initializeResidents();
-      setResidents(initialized);
-      saveData(initialized);
-    } else {
-      setResidents(loadedData);
-    }
-    setLoading(false);
+    const initializeApp = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const residentId = params.get('resident');
+      
+      const loadedData = await loadData();
+      if (residentId) {
+        setCurrentView(residentId);
+      }
+      
+      if (!loadedData || loadedData.length === 0) {
+        const initialized = initializeResidents();
+        setResidents(initialized);
+        await saveData(initialized);
+      } else {
+        setResidents(loadedData);
+      }
+      setLoading(false);
+    };
+
+    initializeApp();
   }, []);
 
-  const updateResidents = (newResidents) => {
+  const updateResidents = async (newResidents) => {
     setResidents(newResidents);
-    saveData(newResidents);
+    await saveData(newResidents);
   };
 
   if (loading) {

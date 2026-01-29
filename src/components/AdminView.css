@@ -66,6 +66,13 @@
   gap: 1rem;
 }
 
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .card h2 {
   font-family: 'Oswald', sans-serif;
   font-size: 1.8rem;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Plus, Copy, Check, Home, Edit, Trash2, Droplet } from 'lucide-react';
+import { Settings, Plus, Copy, Check, Home, Edit, Trash2, Droplet, Download } from 'lucide-react';
 import { generateResidentLink, calculateConsumption } from '../utils/storage';
 import './AdminView.css';
 
@@ -202,6 +202,36 @@ function AdminView({ residents, updateResidents }) {
     setShowNewResident(false);
   };
 
+  const exportReadings = () => {
+    const exportData = residents.map(resident => ({
+      id: resident.id,
+      name: resident.name,
+      apartment: resident.apartment,
+      email: resident.email,
+      meters: resident.meters,
+      meterIds: resident.meterIds || [],
+      readings: (resident.readings || []).map(reading => ({
+        id: reading.id,
+        date: reading.date,
+        meters: reading.meters,
+        timestamp: reading.timestamp
+      }))
+    }));
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: 'application/json'
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const date = new Date().toISOString().split('T')[0];
+    link.href = url;
+    link.download = `water-readings-${date}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const sortedResidents = [...residents].sort((a, b) => {
     const numA = parseFloat(a.apartment.split('-')[1]);
     const numB = parseFloat(b.apartment.split('-')[1]);
@@ -234,10 +264,16 @@ function AdminView({ residents, updateResidents }) {
             <div className="card">
               <div className="card-header">
                 <h2>IEDZĪVOTĀJI ({residents.length})</h2>
-                <button className="btn btn-primary" onClick={() => setShowNewResident(true)}>
-                  <Plus size={20} />
-                  Pievienot iedzīvotāju
-                </button>
+                <div className="card-actions">
+                  <button className="btn btn-secondary" onClick={exportReadings}>
+                    <Download size={20} />
+                    Eksportēt datus
+                  </button>
+                  <button className="btn btn-primary" onClick={() => setShowNewResident(true)}>
+                    <Plus size={20} />
+                    Pievienot iedzīvotāju
+                  </button>
+                </div>
               </div>
 
               {sortedResidents.map(resident => {
@@ -394,8 +430,11 @@ function AdminView({ residents, updateResidents }) {
                 <div className="stat-box total">
                   <div className="stat-box-value">
                     {residents.reduce((sum, r) => {
-                      const cons = r.readings.length >= 2 ? calculateConsumption(r.readings, r.meters) : null;
-                      return sum + (cons ? cons.total : 0);
+                      const lastReading = r.readings?.[0];
+                      if (!lastReading || !lastReading.meters) return sum;
+                      const metersTotal = Object.values(lastReading.meters)
+                        .reduce((meterSum, value) => meterSum + (Number(value) || 0), 0);
+                      return sum + metersTotal;
                     }, 0).toFixed(2)}
                   </div>
                   <div className="stat-box-label">m³ kopā</div>
