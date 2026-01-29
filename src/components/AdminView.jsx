@@ -243,7 +243,11 @@ function AdminView({ residents, updateResidents }) {
       const result = await sendReminderEmails(residentsWithEmail);
       alert(`E-pasta atgādinājumi sūtīti: ${result.sent} sekmīgi, ${result.failed} nesekmīgi`);
     } catch (error) {
-      alert(`Kļūda sūtot e-pastus: ${error.message}`);
+      if (error.message === 'Failed to fetch') {
+        alert('Pieprasījums nosūtīts, bet pārlūks nevarēja nolasīt atbildi (CORS). E-pasti var būt nosūtīti. Pārbaudiet Supabase funkcijas logus.');
+      } else {
+        alert(`Kļūda sūtot e-pastus: ${error.message}`);
+      }
     }
   };
 
