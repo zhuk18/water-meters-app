@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Settings, Plus, Copy, Check, Home, Edit, Trash2, Droplet, Download, Mail } from 'lucide-react';
-import { generateResidentLink, calculateConsumption, sendReminderEmails } from '../utils/storage';
+import { Settings, Plus, Copy, Check, Home, Edit, Trash2, Droplet, Download, Mail, FileUp, Bell } from 'lucide-react';
+import { generateResidentLink, calculateConsumption, sendReminderEmails, uploadInvoice, listResidentInvoices, sendInvoiceNotification } from '../utils/storage';
 import './AdminView.css';
 
 function AdminView({ residents, updateResidents }) {
@@ -24,6 +24,66 @@ function AdminView({ residents, updateResidents }) {
     date: new Date().toISOString().split('T')[0]
   });
   const [copiedId, setCopiedId] = useState(null);
+  const [showUploadInvoice, setShowUploadInvoice] = useState(false);
+  const [uploadingResidentId, setUploadingResidentId] = useState(null);
+  const [invoiceFile, setInvoiceFile] = useState(null);
+  const [uploadingInvoice, setUploadingInvoice] = useState(false);
+  const [sendingNotification, setSendingNotification] = useState(false);
+
+  const notifyAboutInvoice = async (residentId) => {
+    const resident = residents.find(r => r.id === residentId);
+    if (!resident || !resident.email) {
+      alert('Iedzīvotājam nav e-pasta adreses');
+      return;
+    }
+
+    setSendingNotification(true);
+    try {
+      const invoices = await listResidentInvoices(residentId);
+      if (invoices.length === 0) {
+        alert('Nav rēķinu, par ko paziņot');
+        return;
+      }
+
+      const latestInvoice = invoices[0];
+      await sendInvoiceNotification(resident, latestInvoice);
+      alert('Paziņojums nosūtīts!');
+    } catch (error) {
+      if (error.message === 'Failed to fetch') {
+        alert('Pieprasījums nosūtīts, bet pārlūks nevarēja nolasīt atbildi (CORS). E-pasts var būt nosūtīts.');
+      } else {
+        alert(`Kļūda sūtot paziņojumu: ${error.message}`);
+      }
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+
+  const openUploadInvoice = (residentId) => {
+    setUploadingResidentId(residentId);
+    setInvoiceFile(null);
+    setShowUploadInvoice(true);
+  };
+
+  const handleInvoiceUpload = async () => {
+    if (!invoiceFile) {
+      alert('Lūdzu, izvēlieties failu');
+      return;
+    }
+
+    setUploadingInvoice(true);
+    try {
+      await uploadInvoice(uploadingResidentId, invoiceFile);
+      alert('Rēķins sekmīgi augšupielādēts');
+      setShowUploadInvoice(false);
+      setInvoiceFile(null);
+      setUploadingResidentId(null);
+    } catch (error) {
+      alert(`Kļūda augšupielādējot rēķinu: ${error.message}`);
+    } finally {
+      setUploadingInvoice(false);
+    }
+  };
 
   const copyLink = (residentId) => {
     const link = generateResidentLink(residentId);
@@ -203,29 +263,95 @@ function AdminView({ residents, updateResidents }) {
   };
 
   const exportReadings = () => {
-    const exportData = residents.map(resident => ({
-      id: resident.id,
-      name: resident.name,
-      apartment: resident.apartment,
-      email: resident.email,
-      meters: resident.meters,
-      meterIds: resident.meterIds || [],
-      readings: (resident.readings || []).map(reading => ({
-        id: reading.id,
-        date: reading.date,
-        meters: reading.meters,
-        timestamp: reading.timestamp
-      }))
-    }));
+    const escapeCsv = (value) => {
+      if (value === null || value === undefined) return '';
+      const stringValue = String(value);
+      if (/[",\n]/.test(stringValue)) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+      return stringValue;
+    };
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-      type: 'application/json'
+    const maxMeters = residents.reduce((max, resident) => {
+      const metersCount = Number(resident.meters) || 0;
+      return Math.max(max, metersCount);
+    }, 0);
+
+    const meterHeaders = Array.from({ length: maxMeters }, (_, i) => `meter_${i + 1}`);
+    const headers = [
+      'resident_id',
+      'resident_name',
+      'apartment',
+      'email',
+      'meters_count',
+      'meter_ids',
+      'reading_id',
+      'reading_date',
+      'reading_timestamp',
+      ...meterHeaders
+    ];
+
+    const rows = [headers.join(',')];
+
+    residents.forEach(resident => {
+      const baseData = {
+        resident_id: resident.id,
+        resident_name: resident.name,
+        apartment: resident.apartment,
+        email: resident.email,
+        meters_count: resident.meters,
+        meter_ids: (resident.meterIds || []).join(';')
+      };
+
+      const readings = resident.readings || [];
+      if (readings.length === 0) {
+        const row = [
+          baseData.resident_id,
+          baseData.resident_name,
+          baseData.apartment,
+          baseData.email,
+          baseData.meters_count,
+          baseData.meter_ids,
+          '',
+          '',
+          '',
+          ...meterHeaders.map(() => '')
+        ].map(escapeCsv).join(',');
+        rows.push(row);
+        return;
+      }
+
+      readings.forEach(reading => {
+        const meters = reading.meters || {};
+        const meterValues = meterHeaders.map((_, index) => {
+          const meterNumber = index + 1;
+          return meters[meterNumber] ?? '';
+        });
+
+        const row = [
+          baseData.resident_id,
+          baseData.resident_name,
+          baseData.apartment,
+          baseData.email,
+          baseData.meters_count,
+          baseData.meter_ids,
+          reading.id,
+          reading.date,
+          reading.timestamp,
+          ...meterValues
+        ].map(escapeCsv).join(',');
+
+        rows.push(row);
+      });
     });
+
+    const csvContent = rows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     const date = new Date().toISOString().split('T')[0];
     link.href = url;
-    link.download = `water-readings-${date}.json`;
+    link.download = `water-readings-${date}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -252,8 +378,26 @@ function AdminView({ residents, updateResidents }) {
   };
 
   const sortedResidents = [...residents].sort((a, b) => {
-    const numA = parseFloat(a.apartment.split('-')[1]);
-    const numB = parseFloat(b.apartment.split('-')[1]);
+    // Extract apartment numbers, handling different formats
+    const getApartmentNumber = (apt) => {
+      if (!apt) return 0;
+      // If format is "7-12", extract "12"
+      if (apt.includes('-')) {
+        const parts = apt.split('-');
+        return parseFloat(parts[1]) || parseFloat(parts[0]) || 0;
+      }
+      // Otherwise parse the whole string
+      return parseFloat(apt) || 0;
+    };
+    
+    const numA = getApartmentNumber(a.apartment);
+    const numB = getApartmentNumber(b.apartment);
+    
+    // If numbers are equal or invalid, fall back to string comparison
+    if (numA === numB) {
+      return a.apartment.localeCompare(b.apartment);
+    }
+    
     return numA - numB;
   });
 
@@ -286,15 +430,15 @@ function AdminView({ residents, updateResidents }) {
                 <div className="card-actions">
                   <button className="btn btn-secondary" onClick={sendReminders}>
                     <Mail size={20} />
-                    Pārsūtīt atgādinājumus
+                    Pārsūtīt atgād.
                   </button>
                   <button className="btn btn-secondary" onClick={exportReadings}>
                     <Download size={20} />
-                    Eksportēt datus
+                    Eksportēt
                   </button>
                   <button className="btn btn-primary" onClick={() => setShowNewResident(true)}>
                     <Plus size={20} />
-                    Pievienot iedzīvotāju
+                    Piev. iedzīvotāju
                   </button>
                 </div>
               </div>
@@ -329,7 +473,7 @@ function AdminView({ residents, updateResidents }) {
                           ) : (
                             <>
                               <Copy size={16} />
-                              Kopēt saiti
+                              Saite
                             </>
                           )}
                         </button>
@@ -338,7 +482,7 @@ function AdminView({ residents, updateResidents }) {
                           onClick={() => editResident(resident)}
                         >
                           <Edit size={16} />
-                          Rediģēt
+                          Rediģ.
                         </button>
                         <button 
                           className="btn btn-delete"
@@ -352,7 +496,23 @@ function AdminView({ residents, updateResidents }) {
                           onClick={() => openAddReading(resident.id)}
                         >
                           <Droplet size={16} />
-                          Pievienot rādījumus
+                          Piev.
+                        </button>
+                        <button 
+                          className="btn btn-secondary"
+                          onClick={() => openUploadInvoice(resident.id)}
+                        >
+                          <FileUp size={16} />
+                          Augš. rēķ.
+                        </button>
+                        <button 
+                          className="btn btn-secondary"
+                          onClick={() => notifyAboutInvoice(resident.id)}
+                          disabled={sendingNotification || !resident.email}
+                          title={!resident.email ? 'Nav e-pasta adreses' : 'Paziņot par rēķinu'}
+                        >
+                          <Bell size={16} />
+                          Paziņ.
                         </button>
                       </div>
                     </div>
@@ -453,14 +613,12 @@ function AdminView({ residents, updateResidents }) {
                 <div className="stat-box total">
                   <div className="stat-box-value">
                     {residents.reduce((sum, r) => {
-                      const lastReading = r.readings?.[0];
-                      if (!lastReading || !lastReading.meters) return sum;
-                      const metersTotal = Object.values(lastReading.meters)
-                        .reduce((meterSum, value) => meterSum + (Number(value) || 0), 0);
-                      return sum + metersTotal;
+                      if (!r.readings || r.readings.length < 2) return sum;
+                      const consumption = calculateConsumption(r.readings, r.meters);
+                      return sum + (consumption?.total || 0);
                     }, 0).toFixed(2)}
                   </div>
-                  <div className="stat-box-label">m³ kopā</div>
+                  <div className="stat-box-label">m³ kopā (patēriņš)</div>
                 </div>
               </div>
             </div>
@@ -704,6 +862,45 @@ function AdminView({ residents, updateResidents }) {
                 onClick={editReading}
               >
                 Saglabāt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUploadInvoice && uploadingResidentId && (
+        <div className="modal-overlay">
+          <div className="card modal-card">
+            <h3>AUGŠUPIELĀDĒT RĒĶINU</h3>
+            <div className="form-group">
+              <label>Rēķina fails (PDF, JPG, PNG)</label>
+              <input
+                type="file"
+                className="input"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(e) => setInvoiceFile(e.target.files?.[0] || null)}
+              />
+              {invoiceFile && (
+                <p className="file-name">Izvēlēts fails: {invoiceFile.name}</p>
+              )}
+            </div>
+            <div className="modal-actions">
+              <button 
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowUploadInvoice(false);
+                  setUploadingResidentId(null);
+                  setInvoiceFile(null);
+                }}
+              >
+                Atcelt
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={handleInvoiceUpload}
+                disabled={uploadingInvoice}
+              >
+                {uploadingInvoice ? 'Augšupielādē...' : 'Augšupielādēt'}
               </button>
             </div>
           </div>

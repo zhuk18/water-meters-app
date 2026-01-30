@@ -284,7 +284,7 @@ export const calculateConsumption = (readings, meterCount) => {
   };
 };
 
-export const sendReminderEmails = async (residents, subject = 'Pienāk laiks ievadīt ūdens skaitītāju rādījumus', message = 'Lūdzu ievadiet jūsu mājokļa ūdens skaitītāju rādījumus. Tas aizņem tikai dažas minūtes.') => {
+export const sendReminderEmails = async (residents, subject = 'Lūdzu nodot ūdens skaitītāju rādījumus', message = 'Lūdzu ievadiet jūsu mājokļa ūdens skaitītāju rādījumus. Tas aizņem tikai dažas minūtes.') => {
   try {
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
     const functionUrl = `${SUPABASE_URL}/functions/v1/send-reminder-emails`;
@@ -316,6 +316,147 @@ export const sendReminderEmails = async (residents, subject = 'Pienāk laiks iev
     return result;
   } catch (error) {
     console.error('Error sending reminder emails:', error);
+    throw error;
+  }
+};
+
+export const uploadInvoice = async (residentId, file) => {
+  try {
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+    const timestamp = Date.now();
+    const fileName = `${residentId}-${timestamp}-${file.name}`;
+    const filePath = `invoices/${fileName}`;
+
+    // Upload file to Supabase Storage
+    const uploadResponse = await fetch(`${SUPABASE_URL}/storage/v1/object/invoices/${fileName}`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: file,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      throw new Error(errorText || 'Failed to upload invoice file');
+    }
+
+    // Generate public URL
+    const fileUrl = `${SUPABASE_URL}/storage/v1/object/public/invoices/${fileName}`;
+
+    // Save invoice metadata to database
+    const invoiceRecord = {
+      resident_id: residentId,
+      file_name: file.name,
+      file_path: filePath,
+      file_url: fileUrl,
+      file_size: file.size,
+      file_type: file.type,
+      uploaded_at: new Date().toISOString()
+    };
+
+    const dbResponse = await supabaseFetch('/invoices', {
+      method: 'POST',
+      body: JSON.stringify(invoiceRecord)
+    });
+
+    if (!dbResponse.ok) {
+      const errorText = await dbResponse.text();
+      throw new Error(errorText || 'Failed to save invoice metadata');
+    }
+
+    return { success: true, fileName, filePath, fileUrl };
+  } catch (error) {
+    console.error('Error uploading invoice:', error);
+    throw error;
+  }
+};
+
+export const listResidentInvoices = async (residentId) => {
+  try {
+    const response = await supabaseFetch(`/invoices?resident_id=eq.${residentId}&order=uploaded_at.desc`);
+
+    if (!response.ok) {
+      throw new Error('Failed to list invoices');
+    }
+
+    const invoices = await response.json();
+    return invoices || [];
+  } catch (error) {
+    console.error('Error listing invoices:', error);
+    return [];
+  }
+};
+
+export const downloadInvoice = async (fileUrl) => {
+  try {
+    const response = await fetch(fileUrl);
+
+    if (!response.ok) {
+      throw new Error('Failed to download invoice');
+    }
+
+    const blob = await response.blob();
+    return blob;
+  } catch (error) {
+    console.error('Error downloading invoice:', error);
+    throw error;
+  }
+};
+
+export const deleteInvoice = async (invoiceId) => {
+  try {
+    const response = await supabaseFetch(`/invoices?id=eq.${invoiceId}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete invoice');
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error deleting invoice:', error);
+    throw error;
+  }
+};
+
+export const sendInvoiceNotification = async (resident, invoice) => {
+  try {
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+    const functionUrl = `${SUPABASE_URL}/functions/v1/send-invoice-notification`;
+
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        resident: {
+          id: resident.id,
+          name: resident.name,
+          email: resident.email,
+          apartment: resident.apartment,
+        },
+        invoice: {
+          file_name: invoice.file_name,
+          file_url: invoice.file_url,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Failed to send invoice notification');
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('Error sending invoice notification:', error);
     throw error;
   }
 };

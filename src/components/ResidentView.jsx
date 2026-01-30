@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Droplet, Calendar, TrendingUp, Plus, Lock } from 'lucide-react';
-import { calculateConsumption } from '../utils/storage';
+import React, { useEffect, useState } from 'react';
+import { Droplet, Calendar, TrendingUp, Plus, Lock, Download } from 'lucide-react';
+import { calculateConsumption, listResidentInvoices, downloadInvoice } from '../utils/storage';
 import './ResidentView.css';
 
 function ResidentView({ residentId, residents, updateResidents }) {
@@ -9,6 +9,8 @@ function ResidentView({ residentId, residents, updateResidents }) {
     meters: {},
     date: new Date().toISOString().split('T')[0]
   });
+  const [invoices, setInvoices] = useState([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
 
   const residentData = residents.find(r => r.id === residentId);
 
@@ -30,6 +32,39 @@ function ResidentView({ residentId, residents, updateResidents }) {
   const consumption = readings.length >= 2
     ? calculateConsumption(readings, meterCount)
     : null;
+
+  const loadInvoices = async () => {
+    setLoadingInvoices(true);
+    try {
+      const invoicesList = await listResidentInvoices(residentId);
+      setInvoices(invoicesList);
+    } catch (error) {
+      console.error('Error loading invoices:', error);
+      alert('Kļūda ielādējot rēķinus');
+    } finally {
+      setLoadingInvoices(false);
+    }
+  };
+
+  useEffect(() => {
+    loadInvoices();
+  }, [residentId]);
+
+  const handleDownloadInvoice = async (invoice) => {
+    try {
+      const blob = await downloadInvoice(invoice.file_url);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = invoice.file_name || 'invoice.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(`Kļūda lejupielādējot rēķinu: ${error.message}`);
+    }
+  };
 
   const handleAddReading = () => {
     // Check if all meter readings are filled
@@ -165,6 +200,50 @@ function ResidentView({ residentId, residents, updateResidents }) {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <h2>RĒĶINI</h2>
+          </div>
+
+          {loadingInvoices ? (
+            <div className="no-readings">
+              <Droplet size={64} />
+              <p>Ielādē...</p>
+            </div>
+          ) : invoices.length === 0 ? (
+            <div className="no-readings">
+              <Droplet size={64} />
+              <p>Rēķini nav pieejami</p>
+            </div>
+          ) : (
+            <div className="invoices-list">
+              {invoices.map((invoice) => {
+                return (
+                  <div key={invoice.id} className="invoice-item">
+                    <div className="invoice-info">
+                      <div className="invoice-name">{invoice.file_name}</div>
+                      <div className="invoice-date">
+                        {new Date(invoice.uploaded_at).toLocaleDateString('lv-LV', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric'
+                        })}
+                      </div>
+                    </div>
+                    <button 
+                      className="btn btn-secondary"
+                      onClick={() => handleDownloadInvoice(invoice)}
+                    >
+                      <Download size={16} />
+                      Lejupielādēt
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

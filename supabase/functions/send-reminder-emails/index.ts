@@ -58,7 +58,7 @@ serve(async (req) => {
                   Ievadīt rādījumus
                 </a>
               </p>
-              <p>Ar cieņu,<br/>Ūdens skaitītāju pārvaldības sistēma</p>
+              <p>Ar cieņu,<br/>Kazarmu 7 pārvaldības sistēma</p>
             `,
           }),
         })
